@@ -1,150 +1,62 @@
-# Snake Race — ARSW Lab #2 (Java 21, Virtual Threads)
+# Solución Laboratorio 2 (SnakeRace & PrimeFinder) — ARSW
 
-**Escuela Colombiana de Ingeniería – Arquitecturas de Software**  
-Laboratorio de programación concurrente: condiciones de carrera, sincronización y colecciones seguras.
-
----
-
-## Requisitos
-
-- **JDK 21** (Temurin recomendado)
-- **Maven 3.9+**
-- SO: Windows, macOS o Linux
+**Estudiante:** Stiven Esneider Pardo Gutierrez  
+**Materia:** Arquitecturas de Software (ARSW)  
 
 ---
 
-## Cómo ejecutar
+## Parte I — PrimeFinder (`wait/notify`)
 
-```bash
-mvn clean verify
-mvn -q -DskipTests exec:java -Dsnakes=4
-```
+### Diseño de Sincronización y Solución
+El programa `PrimeFinder` calcula números primos concurrentemente dividiendo el rango de búsqueda entre múltiples hilos trabajadores (`PrimeWorker`). Se implementó un control de suspensión y reanudación global cada 3 segundos sin incurrir en espera activa (*busy-waiting*):
 
-- `-Dsnakes=N` → inicia el juego con **N** serpientes (por defecto 2).
-- **Controles**:
-  - **Flechas**: serpiente **0** (Jugador 1).
-  - **WASD**: serpiente **1** (si existe).
-  - **Espacio** o botón **Action**: Pausar / Reanudar.
-
----
-
-## Reglas del juego (resumen)
-
-- **N serpientes** corren de forma autónoma (cada una en su propio hilo).
-- **Ratones**: al comer uno, la serpiente **crece** y aparece un **nuevo obstáculo**.
-- **Obstáculos**: si la cabeza entra en un obstáculo hay **rebote**.
-- **Teletransportadores** (flechas rojas): entrar por uno te **saca por su par**.
-- **Rayos (Turbo)**: al pisarlos, la serpiente obtiene **velocidad aumentada** temporal.
-- Movimiento con **wrap-around** (el tablero “se repite” en los bordes).
+1. **Monitor y Lock**: Se utilizó la misma instancia de `PrimeCounter` como el monitor compartido por todos los hilos (`PrimeWorker` y el hilo de control `pauser`). Todos los métodos que acceden o modifican el estado de la pausa o el contador están marcados como `synchronized`.
+2. **Evitar Esperas Activas (*Busy-Waiting*)**: 
+   - En lugar de ciclos vacíos evaluando variables booleanas, los hilos de trabajo llaman a `counter.checkPause()` en cada iteración.
+   - Si el estado `paused` es `true`, el hilo entra en suspensión bloqueada llamando a `wait()`.
+3. **Prevenir *Lost Wakeups***:
+   - Se utiliza un ciclo `while(paused)` alrededor de `wait()` en `checkPause()` para evitar que despertares espurios hagan que un hilo continúe trabajando cuando el estado sigue en pausa.
+   - El hilo `pauser` despierta a todos los trabajadores llamando a `counter.resume()`, el cual cambia `paused = false` y ejecuta `notifyAll()` sobre el monitor.
 
 ---
 
-## Arquitectura (carpetas)
+## Parte II — SnakeRace Concurrente
 
-```
-co.eci.snake
-├─ app/                 # Bootstrap de la aplicación (Main)
-├─ core/                # Dominio: Board, Snake, Direction, Position
-├─ core/engine/         # GameClock (ticks, Pausa/Reanudar)
-├─ concurrency/         # SnakeRunner (lógica por serpiente con virtual threads)
-└─ ui/legacy/           # UI estilo legado (Swing) con grilla y botón Action
-```
+### 1) Análisis de Concurrencia e Identificación de Condiciones de Carrera
+En la estructura base del juego, cada serpiente corría en su propio hilo actualizando de forma asíncrona sus coordenadas y el tablero de juego. Se identificaron los siguientes riesgos y problemas:
+- **Condiciones de Carrera en el Movimiento**: Varias serpientes podían intentar leer o modificar los conjuntos compartidos del tablero (`mice`, `obstacles`, `turbo`, `teleports`) simultáneamente al avanzar.
+- **Colecciones no Seguras**: El uso de colecciones estándar como `HashSet` y `HashMap` en la clase `Board` causaba problemas de inconsistencia y excepciones de modificación concurrente al ser modificadas por múltiples hilos y leídas en paralelo por el hilo de pintado de la UI (Event Dispatch Thread).
+- **Espera Activa en la Pausa**: Detener el movimiento de los hilos de las serpientes mediante encuestas repetitivas de banderas booleanas consumía ciclos de CPU innecesarios.
 
----
+### 2) Solución e Implementación de Regiones Críticas
+Para resolver los problemas identificados, se reestructuró la concurrencia del juego con el menor alcance de bloqueo posible:
 
-# Actividades del laboratorio
+- **Sincronización del Tablero (`Board.java`)**: 
+  - El método principal `step(Snake snake)` está marcado como `synchronized`. Esto asegura que solo una serpiente pueda validar colisiones, comer un ratón/turbo o teletransportarse a la vez, eliminando las condiciones de carrera en los recursos compartidos.
+- **Acceso Seguro desde la UI**: 
+  - Para evitar `ConcurrentModificationException` en el hilo de renderizado (`paintComponent`), los métodos de acceso a las colecciones (`mice()`, `obstacles()`, `turbo()`, `teleports()`) fueron sincronizados y programados para retornar copias defensivas independientes (ej. `return new HashSet<>(obstacles);`).
+  - La clase `Snake` implementa un método `snapshot()` sincronizado para duplicar de manera segura la cola de posiciones del cuerpo de la serpiente antes de ser dibujada en pantalla.
+- **Pausa Eficiente sin Busy-Wait**:
+  - Al pausar el juego mediante el botón `Action` o la tecla `SPACE`, se establece el estado de pausa en el tablero (`board.pauseAll()`).
+  - Cualquier serpiente que intente dar su siguiente paso llamando a `board.step(...)` quedará suspendida en `wait()`, liberando el procesador.
+  - Al reanudar con `board.resumeAll()`, se notifica a todos los hilos usando `notifyAll()` para continuar el juego de inmediato.
 
-## Parte I — (Calentamiento) `wait/notify` en un programa multi-hilo
+### 3) Consistencia Visual al Pausar (Evitando el *Tearing*)
+El programa calcula y muestra de forma consistente:
+1. La serpiente viva más larga.
+2. La primera serpiente en morir (mediante una variable atómica global `deathCounter` que asigna un orden de muerte unívoco en `Snake.kill()`).
 
-1. Toma el programa [**PrimeFinder**](https://github.com/ARSW-ECI/wait-notify-excercise).
-2. Modifícalo para que **cada _t_ milisegundos**:
-   - Se **pausen** todos los hilos trabajadores.
-   - Se **muestre** cuántos números primos se han encontrado.
-   - El programa **espere ENTER** para **reanudar**.
-3. La sincronización debe usar **`synchronized`**, **`wait()`**, **`notify()` / `notifyAll()`** sobre el **mismo monitor** (sin _busy-waiting_).
-4. Entrega en el reporte de laboratorio **las observaciones y/o comentarios** explicando tu diseño de sincronización (qué lock, qué condición, cómo evitas _lost wakeups_).
-
-> Objetivo didáctico: practicar suspensión/continuación **sin** espera activa y consolidar el modelo de monitores en Java.
-
----
-
-## Parte II — SnakeRace concurrente (núcleo del laboratorio)
-
-### 1) Análisis de concurrencia
-
-- Explica **cómo** el código usa hilos para dar autonomía a cada serpiente.
-- **Identifica** y documenta en **`el reporte de laboratorio`**:
-  - Posibles **condiciones de carrera**.
-  - **Colecciones** o estructuras **no seguras** en contexto concurrente.
-  - Ocurrencias de **espera activa** (busy-wait) o de sincronización innecesaria.
-
-### 2) Correcciones mínimas y regiones críticas
-
-- **Elimina** esperas activas reemplazándolas por **señales** / **estados** o mecanismos de la librería de concurrencia.
-- Protege **solo** las **regiones críticas estrictamente necesarias** (evita bloqueos amplios).
-- Justifica en **`el reporte de laboratorio`** cada cambio: cuál era el riesgo y cómo lo resuelves.
-
-### 3) Control de ejecución seguro (UI)
-
-- Implementa la **UI** con **Iniciar / Pausar / Reanudar** (ya existe el botón _Action_ y el reloj `GameClock`).
-- Al **Pausar**, muestra de forma **consistente** (sin _tearing_):
-  - La **serpiente viva más larga**.
-  - La **peor serpiente** (la que **primero murió**).
-- Considera que la suspensión **no es instantánea**; coordina para que el estado mostrado no quede “a medias”.
-
-### 4) Robustez bajo carga
-
-- Ejecuta con **N alto** (`-Dsnakes=20` o más) y/o aumenta la velocidad.
-- El juego **no debe romperse**: sin `ConcurrentModificationException`, sin lecturas inconsistentes, sin _deadlocks_.
-- Si habilitas **teleports** y **turbo**, verifica que las reglas no introduzcan carreras.
-
-> Entregables detallados más abajo.
+**Garantía de Consistencia**: Como `step(...)` y `pauseAll()` se sincronizan sobre el mismo monitor del tablero, ningún hilo de serpiente puede modificar sus datos a mitad de cálculo o mientras se calculan las estadísticas en `togglePause()`. Una vez que el hilo de la UI activa la pausa y lee las longitudes y estados de vida, se asegura de que el estado global esté completamente estático y no "a medias".
 
 ---
 
-## Entregables
+## Instrucciones de Ejecución
 
-1. **Código fuente** funcionando en **Java 21**.
-2. Todo de manera clara en **`**el reporte de laboratorio**`** con:
-   - Data races encontradas y su solución.
-   - Colecciones mal usadas y cómo se protegieron (o sustituyeron).
-   - Esperas activas eliminadas y mecanismo utilizado.
-   - Regiones críticas definidas y justificación de su **alcance mínimo**.
-3. UI con **Iniciar / Pausar / Reanudar** y estadísticas solicitadas al pausar.
-
----
-
-## Criterios de evaluación (10)
-
-- (3) **Concurrencia correcta**: sin data races; sincronización bien localizada.
-- (2) **Pausa/Reanudar**: consistencia visual y de estado.
-- (2) **Robustez**: corre **con N alto** y sin excepciones de concurrencia.
-- (1.5) **Calidad**: estructura clara, nombres, comentarios; sin _code smells_ obvios.
-- (1.5) **Documentación**: **`reporte de laboratorio`** claro, reproducible;
-
----
-
-## Tips y configuración útil
-
-- **Número de serpientes**: `-Dsnakes=N` al ejecutar.
-- **Tamaño del tablero**: cambiar el constructor `new Board(width, height)`.
-- **Teleports / Turbo**: editar `Board.java` (métodos de inicialización y reglas en `step(...)`).
-- **Velocidad**: ajustar `GameClock` (tick) o el `sleep` del `SnakeRunner` (incluye modo turbo).
-
----
-
-## Cómo correr pruebas
-
-```bash
-mvn clean verify
-```
-
-Incluye compilación y ejecución de pruebas JUnit. Si tienes análisis estático, ejecútalo en `verify` o `site` según tu `pom.xml`.
-
----
-
-## Créditos
-
-Este laboratorio es una adaptación modernizada del ejercicio **SnakeRace** de ARSW. El enunciado de actividades se conserva para mantener los objetivos pedagógicos del curso.
-
-**Base construida por el Ing. Javier Toquica.**
+1. **Compilar y Verificar**:
+   ```bash
+   mvn clean verify
+   ```
+2. **Ejecutar el juego con N serpientes** (ej. 4 serpientes):
+   ```bash
+   mvn -q -DskipTests exec:java -Dsnakes=4
+   ```
