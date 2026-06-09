@@ -8,6 +8,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Motor de tiempo (Reloj) del juego que programa y emite impulsos de repintado (ticks)
+ * a intervalos regulares (frecuencia de frames).
+ * Permite cambiar de estado de forma segura (RUNNING, PAUSED, STOPPED).
+ */
 public final class GameClock implements AutoCloseable {
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
   private final long periodMillis;

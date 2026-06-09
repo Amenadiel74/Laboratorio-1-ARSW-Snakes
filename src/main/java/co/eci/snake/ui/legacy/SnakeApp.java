@@ -14,6 +14,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
+/**
+ * Aplicación gráfica (Swing JFrame) principal del juego.
+ * Inicializa los componentes visuales, el reloj de actualización (GameClock) y lanza los hilos virtuales
+ * para cada serpiente. Captura las teclas de control del usuario e implementa el diálogo de estadísticas
+ * pausado de forma consistente y segura.
+ */
 public final class SnakeApp extends JFrame {
 
   private final Board board;

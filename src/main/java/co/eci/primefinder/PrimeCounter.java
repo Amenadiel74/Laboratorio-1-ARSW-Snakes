@@ -1,5 +1,9 @@
 package co.eci.primefinder;
 
+/**
+ * Monitor e indicador de estado compartido para sincronizar el conteo de primos y pausar/reanudar
+ * los hilos trabajadores de forma segura mediante synchronized y wait/notifyAll.
+ */
 public final class PrimeCounter {
     private int count = 0;
     private int workersDone = 0;

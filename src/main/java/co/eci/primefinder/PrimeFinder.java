@@ -6,6 +6,11 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Punto de entrada para el ejercicio de calentamiento de la Parte I.
+ * Inicializa y arranca hilos trabajadores (PrimeWorker) junto con un hilo de control (pauser)
+ * que suspende la ejecución del cálculo de números primos periódicamente para imprimir resultados.
+ */
 public final class PrimeFinder {
 
     private static final int MAX_NUMBER = 100_000;

@@ -7,6 +7,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Representa el tablero compartido de juego en el que se ubican e interactúan los ratones,
+ * los obstáculos, los portales (teletransportadores), los turbos y las serpientes.
+ * Proporciona métodos sincronizados para mover de forma segura a una serpiente (región crítica)
+ * y para realizar operaciones de pausa/reanudación coordinadas mediante wait/notify sin busy-waiting.
+ */
 public final class Board {
   private final int width;
   private final int height;

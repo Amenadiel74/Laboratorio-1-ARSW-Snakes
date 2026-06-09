@@ -4,6 +4,11 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Entidad de dominio que representa a una serpiente individual en el juego.
+ * Mantiene la lista sincronizada de posiciones de su cuerpo, su estado de vida (viva o muerta),
+ * su orden cronológico de muerte mediante un contador atómico y su dirección de movimiento.
+ */
 public final class Snake {
   private static final AtomicInteger idCounter = new AtomicInteger(0);
   private static final AtomicInteger deathCounter = new AtomicInteger(0);

@@ -1,5 +1,9 @@
 package co.eci.primefinder;
 
+/**
+ * Hilo de trabajo que busca y calcula números primos dentro de un rango numérico específico.
+ * En cada iteración verifica si se ha solicitado una pausa a través del monitor compartido (PrimeCounter).
+ */
 public final class PrimeWorker implements Runnable {
     private final int start;
     private final int end;
