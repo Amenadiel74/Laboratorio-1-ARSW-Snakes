@@ -9,12 +9,22 @@ public final class PrimeWorker implements Runnable {
     private final int end;
     private final PrimeCounter counter;
 
+    /**
+     * Constructor para PrimeWorker.
+     * @param start Límite inferior del rango de búsqueda.
+     * @param end Límite superior del rango de búsqueda.
+     * @param counter Instancia del contador de primos compartido (monitor).
+     */
     public PrimeWorker(int start, int end, PrimeCounter counter) {
         this.start = start;
         this.end = end;
         this.counter = counter;
     }
 
+    /**
+     * Ejecuta el ciclo de cálculo de números primos dentro del rango.
+     * Verifica periódicamente si el hilo supervisor ha solicitado una pausa.
+     */
     @Override
     public void run() {
         try {
@@ -31,6 +41,11 @@ public final class PrimeWorker implements Runnable {
         }
     }
 
+    /**
+     * Determina si un número dado es primo.
+     * @param n Número a evaluar.
+     * @return true si es primo, false en caso contrario.
+     */
     private boolean isPrime(int n) {
         if (n < 2) return false;
         if (n == 2) return true;

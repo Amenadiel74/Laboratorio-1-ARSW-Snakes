@@ -19,6 +19,11 @@ public final class PrimeFinder {
 
     private PrimeFinder() {}
 
+    /**
+     * Punto de entrada principal para ejecutar la búsqueda de primos.
+     * @param args Argumentos de consola (no se utilizan).
+     * @throws InterruptedException Si ocurre una interrupción esperando por los hilos trabajadores.
+     */
     public static void main(String[] args) throws InterruptedException {
         var counter = new PrimeCounter(NUM_THREADS);
         var workers = new ArrayList<Thread>();
