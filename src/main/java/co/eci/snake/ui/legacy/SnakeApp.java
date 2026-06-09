@@ -101,10 +101,10 @@ public final class SnakeApp extends JFrame {
 
     if (snakes.size() > 1) {
       var p2 = snakes.get(1);
-      im.put(KeyStroke.getKeyStroke('A'), "p2-left");
-      im.put(KeyStroke.getKeyStroke('D'), "p2-right");
-      im.put(KeyStroke.getKeyStroke('W'), "p2-up");
-      im.put(KeyStroke.getKeyStroke('S'), "p2-down");
+      im.put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A, 0), "p2-left");
+      im.put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_D, 0), "p2-right");
+      im.put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W, 0), "p2-up");
+      im.put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, 0), "p2-down");
       am.put("p2-left", new AbstractAction() {
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -258,7 +258,14 @@ public final class SnakeApp extends JFrame {
         var body = s.snapshot().toArray(new Position[0]);
         for (int i = 0; i < body.length; i++) {
           var p = body[i];
-          Color base = (idx == 0) ? new Color(0, 170, 0) : new Color(0, 160, 180);
+          Color base;
+          if (idx == 0) {
+            base = new Color(0, 170, 0); // Player 1: Green
+          } else if (idx == 1) {
+            base = new Color(0, 120, 255); // Player 2: Blue
+          } else {
+            base = new Color(140, 140, 140); // NPCs: Gray
+          }
           int shade = Math.max(0, 40 - i * 4);
           g2.setColor(new Color(
               Math.min(255, base.getRed() + shade),
